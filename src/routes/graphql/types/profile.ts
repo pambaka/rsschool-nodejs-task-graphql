@@ -1,4 +1,5 @@
 import { GraphQLBoolean, GraphQLInt, GraphQLObjectType, GraphQLString } from 'graphql';
+import { memberType } from './memberType.js';
 
 export const profile = new GraphQLObjectType({
   name: 'Profile',
@@ -8,5 +9,6 @@ export const profile = new GraphQLObjectType({
     yearOfBirth: { type: GraphQLInt },
     userId: { type: GraphQLString },
     memberTypeId: { type: GraphQLString },
+    memberType: { type: memberType },
   },
 });
