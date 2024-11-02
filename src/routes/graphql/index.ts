@@ -1,6 +1,12 @@
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
-import { graphql, GraphQLList, GraphQLObjectType, GraphQLSchema } from 'graphql';
+import {
+  graphql,
+  GraphQLList,
+  GraphQLObjectType,
+  GraphQLScalarType,
+  GraphQLSchema,
+} from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
 import { createPostInput, post } from './types/post.js';
 import { createUserInput, user } from './types/user.js';
@@ -40,9 +46,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           },
         },
         memberType: {
-          args: {
-            id: { type: memberTypeId },
-          },
+          args: { id: { type: memberTypeId } },
           type: memberType,
           resolve: async (_, args: { id: string }) => {
             return await prisma.memberType.findUnique({ where: { id: args.id } });
@@ -56,9 +60,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           },
         },
         post: {
-          args: {
-            id: { type: UUIDType },
-          },
+          args: { id: { type: UUIDType } },
           type: post,
           resolve: (_, args: { id: string }) => {
             return prisma.post.findUnique({ where: { id: args.id } });
@@ -76,9 +78,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           },
         },
         user: {
-          args: {
-            id: { type: UUIDType },
-          },
+          args: { id: { type: UUIDType } },
           type: user,
           resolve: async (_, args: { id: string }) => {
             return await getUser(prisma, args.id);
@@ -92,9 +92,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           },
         },
         profile: {
-          args: {
-            id: { type: UUIDType },
-          },
+          args: { id: { type: UUIDType } },
           type: profile,
           resolve: async (_, args: { id: string }) => {
             return await prisma.profile.findUnique({ where: { id: args.id } });
@@ -106,30 +104,47 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
       name: 'RootMutation',
       fields: {
         createUser: {
-          args: {
-            dto: { type: createUserInput },
-          },
+          args: { dto: { type: createUserInput } },
           type: user,
           resolve: async (_, args: { dto: User }) => {
             return await prisma.user.create({ data: { ...args.dto } });
           },
         },
-        createPost: {
-          args: {
-            dto: { type: createPostInput },
+        deleteUser: {
+          args: { id: { type: UUIDType } },
+          type: new GraphQLScalarType({ name: 'DeletedUser' }),
+          resolve: async (_, args: { id: string }) => {
+            return await prisma.user.delete({ where: { id: args.id } });
           },
+        },
+
+        createPost: {
+          args: { dto: { type: createPostInput } },
           type: post,
           resolve: async (_, args: { dto: Post }) => {
             return await prisma.post.create({ data: { ...args.dto } });
           },
         },
-        createProfile: {
-          args: {
-            dto: { type: createProfileInput },
+        deletePost: {
+          args: { id: { type: UUIDType } },
+          type: new GraphQLScalarType({ name: 'DeletedPost' }),
+          resolve: async (_, args: { id: string }) => {
+            return await prisma.post.delete({ where: { id: args.id } });
           },
+        },
+
+        createProfile: {
+          args: { dto: { type: createProfileInput } },
           type: profile,
           resolve: async (_, args: { dto: Profile }) => {
             return await prisma.profile.create({ data: { ...args.dto } });
+          },
+        },
+        deleteProfile: {
+          args: { id: { type: UUIDType } },
+          type: new GraphQLScalarType({ name: 'DeletedProfile' }),
+          resolve: async (_, args: { id: string }) => {
+            return await prisma.profile.delete({ where: { id: args.id } });
           },
         },
       },
