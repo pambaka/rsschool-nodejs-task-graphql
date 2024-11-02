@@ -114,6 +114,18 @@ async function getUser(prisma: PrismaClient, id: string) {
 
   const userPosts = await prisma.post.findMany({ where: { authorId: id } });
 
+  const subscribers = await getSubscribers(prisma, id);
+  const subscribersWithSubscription = subscribers.map(async (sub) => {
+    const subscriptions = await getSubscriptions(prisma, sub.id);
+    return { ...sub, userSubscribedTo: subscriptions ?? [] };
+  });
+
+  const subscriptions = await getSubscriptions(prisma, id);
+  const subscriptionsWithSubscribers = subscriptions.map(async (sub) => {
+    const subscribers = await getSubscribers(prisma, sub.id);
+    return { ...sub, subscribedToUser: subscribers ?? [] };
+  });
+
   const user = await prisma.user.findUnique({ where: { id } });
 
   if (!user) return null;
@@ -122,7 +134,21 @@ async function getUser(prisma: PrismaClient, id: string) {
     ...user,
     profile: userProfile ? { ...userProfile, memberType: userMemberType } : null,
     posts: userPosts ?? [],
+    subscribedToUser: subscribersWithSubscription ?? [],
+    userSubscribedTo: subscriptionsWithSubscribers ?? [],
   };
+}
+
+async function getSubscriptions(prisma: PrismaClient, id: string) {
+  return await prisma.user.findMany({
+    where: { subscribedToUser: { some: { subscriberId: id } } },
+  });
+}
+
+async function getSubscribers(prisma: PrismaClient, id: string) {
+  return await prisma.user.findMany({
+    where: { userSubscribedTo: { some: { authorId: id } } },
+  });
 }
 
 export default plugin;
