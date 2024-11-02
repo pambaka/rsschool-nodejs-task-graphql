@@ -2,11 +2,11 @@ import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
 import { graphql, GraphQLList, GraphQLObjectType, GraphQLSchema } from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
-import { post } from './types/post.js';
-import { user } from './types/user.js';
-import { profile } from './types/profile.js';
+import { createPostInput, post } from './types/post.js';
+import { createUserInput, user } from './types/user.js';
+import { createProfileInput, profile } from './types/profile.js';
 import { UUIDType } from './types/uuid.js';
-import { PrismaClient } from '@prisma/client';
+import { Post, PrismaClient, Profile, User } from '@prisma/client';
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
@@ -98,6 +98,38 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           type: profile,
           resolve: async (_, args: { id: string }) => {
             return await prisma.profile.findUnique({ where: { id: args.id } });
+          },
+        },
+      },
+    }),
+    mutation: new GraphQLObjectType({
+      name: 'RootMutation',
+      fields: {
+        createUser: {
+          args: {
+            dto: { type: createUserInput },
+          },
+          type: user,
+          resolve: async (_, args: { dto: User }) => {
+            return await prisma.user.create({ data: { ...args.dto } });
+          },
+        },
+        createPost: {
+          args: {
+            dto: { type: createPostInput },
+          },
+          type: post,
+          resolve: async (_, args: { dto: Post }) => {
+            return await prisma.post.create({ data: { ...args.dto } });
+          },
+        },
+        createProfile: {
+          args: {
+            dto: { type: createProfileInput },
+          },
+          type: profile,
+          resolve: async (_, args: { dto: Profile }) => {
+            return await prisma.profile.create({ data: { ...args.dto } });
           },
         },
       },

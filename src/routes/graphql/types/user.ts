@@ -3,6 +3,7 @@ import {
   GraphQLInterfaceType,
   GraphQLList,
   GraphQLObjectType,
+  GraphQLScalarType,
   GraphQLString,
 } from 'graphql';
 import { profile } from './profile.js';
@@ -33,4 +34,27 @@ export const user = new GraphQLObjectType({
     userSubscribedTo: { type: new GraphQLList(UserInterface) },
   },
   interfaces: [UserInterface],
+});
+
+const userInputKeys = ['name', 'balance'];
+
+const isValidUserInput = (value: object) => {
+  if (userInputKeys.every((key) => key in value)) return true;
+  return false;
+};
+
+export const createUserInput = new GraphQLScalarType({
+  name: 'CreateUserInput',
+  parseValue(value) {
+    if (value && typeof value === 'object' && isValidUserInput(value)) return value;
+
+    if (typeof value === 'string') {
+      const user = JSON.parse(value) as object;
+      if (isValidUserInput(user)) return user;
+    }
+
+    throw new Error(
+      `Invalid input. Some of the required keys (${userInputKeys.join(', ')}) are missing.`,
+    );
+  },
 });
