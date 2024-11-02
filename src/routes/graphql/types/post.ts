@@ -32,3 +32,7 @@ export const createPostInput = new GraphQLScalarType({
     );
   },
 });
+
+export const changePostInput = new GraphQLScalarType({
+  name: 'ChangePostInput',
+});

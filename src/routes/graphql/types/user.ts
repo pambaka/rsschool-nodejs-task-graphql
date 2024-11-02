@@ -58,3 +58,7 @@ export const createUserInput = new GraphQLScalarType({
     );
   },
 });
+
+export const changeUserInput = new GraphQLScalarType({
+  name: 'ChangeUserInput',
+});

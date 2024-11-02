@@ -8,9 +8,9 @@ import {
   GraphQLSchema,
 } from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
-import { createPostInput, post } from './types/post.js';
-import { createUserInput, user } from './types/user.js';
-import { createProfileInput, profile } from './types/profile.js';
+import { changePostInput, createPostInput, post } from './types/post.js';
+import { changeUserInput, createUserInput, user } from './types/user.js';
+import { changeProfileInput, createProfileInput, profile } from './types/profile.js';
 import { UUIDType } from './types/uuid.js';
 import { Post, PrismaClient, Profile, User } from '@prisma/client';
 
@@ -110,6 +110,19 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
             return await prisma.user.create({ data: { ...args.dto } });
           },
         },
+        changeUser: {
+          args: {
+            id: { type: UUIDType },
+            dto: { type: changeUserInput },
+          },
+          type: user,
+          resolve: async (_, args: { id: string; dto: User }) => {
+            return await prisma.user.update({
+              where: { id: args.id },
+              data: { ...args.dto },
+            });
+          },
+        },
         deleteUser: {
           args: { id: { type: UUIDType } },
           type: new GraphQLScalarType({ name: 'DeletedUser' }),
@@ -125,6 +138,19 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
             return await prisma.post.create({ data: { ...args.dto } });
           },
         },
+        changePost: {
+          args: {
+            id: { type: UUIDType },
+            dto: { type: changePostInput },
+          },
+          type: post,
+          resolve: async (_, args: { id: string; dto: Post }) => {
+            return await prisma.post.update({
+              where: { id: args.id },
+              data: { ...args.dto },
+            });
+          },
+        },
         deletePost: {
           args: { id: { type: UUIDType } },
           type: new GraphQLScalarType({ name: 'DeletedPost' }),
@@ -138,6 +164,21 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           type: profile,
           resolve: async (_, args: { dto: Profile }) => {
             return await prisma.profile.create({ data: { ...args.dto } });
+          },
+        },
+        changeProfile: {
+          args: {
+            id: { type: UUIDType },
+            dto: { type: changeProfileInput },
+          },
+          type: profile,
+          resolve: async (_, args: { id: string; dto: Profile }) => {
+            if (args.id && args.dto.userId && args.id !== args.dto.userId)
+              throw new Error(`Invalid userId`);
+            return await prisma.profile.update({
+              where: { id: args.id },
+              data: { ...args.dto },
+            });
           },
         },
         deleteProfile: {

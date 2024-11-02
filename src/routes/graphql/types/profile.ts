@@ -49,3 +49,7 @@ export const createProfileInput = new GraphQLScalarType({
     );
   },
 });
+
+export const changeProfileInput = new GraphQLScalarType({
+  name: 'ChangeProfileInput',
+});
