@@ -6,6 +6,8 @@ import {
   GraphQLObjectType,
   GraphQLScalarType,
   GraphQLSchema,
+  parse,
+  validate,
 } from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
 import { changePostInput, createPostInput, post } from './types/post.js';
@@ -13,6 +15,7 @@ import { changeUserInput, createUserInput, subscriber, user } from './types/user
 import { changeProfileInput, createProfileInput, profile } from './types/profile.js';
 import { UUIDType } from './types/uuid.js';
 import { Post, PrismaClient, Profile, User } from '@prisma/client';
+import depthLimit from 'graphql-depth-limit';
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
@@ -27,9 +30,24 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
     async handler(req) {
+      const source = req.body.query;
+      const document = parse(req.body.query);
+
+      const maxQueryDepth = 5;
+      const errors = validate(schema, document, [depthLimit(maxQueryDepth)]);
+
+      if (errors.length !== 0)
+        return {
+          errors: [
+            {
+              message: `Query depth exceeds maximum operation depth of ${maxQueryDepth}`,
+            },
+          ],
+        };
+
       return graphql({
         schema,
-        source: req.body.query,
+        source,
         variableValues: req.body.variables,
       });
     },
