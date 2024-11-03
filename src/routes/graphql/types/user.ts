@@ -10,7 +10,7 @@ import { profile } from './profile.js';
 import { post } from './post.js';
 
 const UserInterface: GraphQLInterfaceType = new GraphQLInterfaceType({
-  name: 'Subscriber',
+  name: 'UserInterface',
   fields: () => ({
     id: { type: GraphQLString },
     name: { type: GraphQLString },
@@ -61,4 +61,8 @@ export const createUserInput = new GraphQLScalarType({
 
 export const changeUserInput = new GraphQLScalarType({
   name: 'ChangeUserInput',
+});
+
+export const subscriber = new GraphQLScalarType({
+  name: 'Subscriber',
 });

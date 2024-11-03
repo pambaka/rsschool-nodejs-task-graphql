@@ -9,7 +9,7 @@ import {
 } from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
 import { changePostInput, createPostInput, post } from './types/post.js';
-import { changeUserInput, createUserInput, user } from './types/user.js';
+import { changeUserInput, createUserInput, subscriber, user } from './types/user.js';
 import { changeProfileInput, createProfileInput, profile } from './types/profile.js';
 import { UUIDType } from './types/uuid.js';
 import { Post, PrismaClient, Profile, User } from '@prisma/client';
@@ -186,6 +186,36 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           type: new GraphQLScalarType({ name: 'DeletedProfile' }),
           resolve: async (_, args: { id: string }) => {
             return await prisma.profile.delete({ where: { id: args.id } });
+          },
+        },
+
+        subscribeTo: {
+          args: {
+            userId: { type: UUIDType },
+            authorId: { type: UUIDType },
+          },
+          type: subscriber,
+          resolve: async (_, args: { userId: string; authorId: string }) => {
+            return await prisma.subscribersOnAuthors.create({
+              data: { authorId: args.authorId, subscriberId: args.userId },
+            });
+          },
+        },
+        unsubscribeFrom: {
+          args: {
+            userId: { type: UUIDType },
+            authorId: { type: UUIDType },
+          },
+          type: subscriber,
+          resolve: async (_, args: { userId: string; authorId: string }) => {
+            return await prisma.subscribersOnAuthors.delete({
+              where: {
+                subscriberId_authorId: {
+                  authorId: args.authorId,
+                  subscriberId: args.userId,
+                },
+              },
+            });
           },
         },
       },
