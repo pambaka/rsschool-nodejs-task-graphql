@@ -11,11 +11,21 @@ import {
 } from 'graphql';
 import { memberType, memberTypeId } from './types/memberType.js';
 import { changePostInput, createPostInput, post } from './types/post.js';
-import { changeUserInput, createUserInput, subscriber, user } from './types/user.js';
+import {
+  changeUserInput,
+  createUserInput,
+  subscriber,
+  user,
+  UserWithSubs,
+} from './types/user.js';
 import { changeProfileInput, createProfileInput, profile } from './types/profile.js';
 import { UUIDType } from './types/uuid.js';
-import { Post, PrismaClient, Profile, User } from '@prisma/client';
+import { MemberType, Post, Profile, User } from '@prisma/client';
 import depthLimit from 'graphql-depth-limit';
+import DataLoader from 'dataloader';
+import { Context } from './types/context.js';
+
+let keys: string[] = [];
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
@@ -45,10 +55,47 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           ],
         };
 
+      const users = await prisma.user.findMany({
+        include: { subscribedToUser: true, userSubscribedTo: true },
+      });
+      keys = users.map((user) => user.id);
+      const userLoader: DataLoader<
+        unknown,
+        Promise<UserWithSubs | UserWithSubs[] | undefined>
+      > = new DataLoader(async (key) => {
+        return key.map(async (key) => users.find((user) => user.id === key));
+      });
+
+      const profileLoader: DataLoader<
+        unknown,
+        Promise<Profile | undefined>
+      > = new DataLoader(async (keys) => {
+        const profiles = await prisma.profile.findMany();
+        return keys.map(async (key) =>
+          profiles.find((profile) => profile.userId === key),
+        );
+      });
+
+      const postLoader: DataLoader<unknown, Promise<Post[] | undefined>> = new DataLoader(
+        async (keys) => {
+          const posts = await prisma.post.findMany();
+          return keys.map(async (key) => posts.filter((post) => post.authorId === key));
+        },
+      );
+
+      const memberTypeLoader: DataLoader<
+        unknown,
+        Promise<MemberType | undefined>
+      > = new DataLoader(async (keys) => {
+        const memberTypes = await prisma.memberType.findMany();
+        return keys.map(async (key) => memberTypes.find((mType) => mType.id === key));
+      });
+
       return graphql({
         schema,
         source,
         variableValues: req.body.variables,
+        contextValue: { userLoader, profileLoader, postLoader, memberTypeLoader },
       });
     },
   });
@@ -87,19 +134,20 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
 
         users: {
           type: new GraphQLList(user),
-          resolve: async () => {
-            const users = (await prisma.user.findMany()).map(async (args) => {
-              return await getUser(prisma, args.id);
-            });
+          resolve: async (_, arg, context: Context) => {
+            const users = (await context.userLoader.loadMany(keys)) as UserWithSubs[];
 
-            return users;
+            return users.map(async (args) => {
+              return await getUser(args.id, users, context);
+            });
           },
         },
         user: {
           args: { id: { type: UUIDType } },
           type: user,
-          resolve: async (_, args: { id: string }) => {
-            return await getUser(prisma, args.id);
+          resolve: async (_, args: { id: string }, context: Context) => {
+            const users = (await context.userLoader.loadMany(keys)) as UserWithSubs[];
+            return await getUser(args.id, users, context);
           },
         },
 
@@ -118,6 +166,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
         },
       },
     }),
+
     mutation: new GraphQLObjectType({
       name: 'RootMutation',
       fields: {
@@ -241,28 +290,28 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   });
 };
 
-async function getUser(prisma: PrismaClient, id: string) {
-  const userProfile = await prisma.profile.findUnique({ where: { userId: id } });
+async function getUser(id: string, users: UserWithSubs[], context: Context) {
+  const userProfile = await context.profileLoader.load(id);
 
   const userMemberType = userProfile
-    ? await prisma.memberType.findUnique({ where: { id: userProfile.memberTypeId } })
+    ? await context.memberTypeLoader.load(userProfile.memberTypeId)
     : null;
 
-  const userPosts = await prisma.post.findMany({ where: { authorId: id } });
+  const userPosts = await context.postLoader.load(id);
 
-  const subscribers = await getSubscribers(prisma, id);
+  const subscribers = (await getSubscribers(id, users)) ?? [];
   const subscribersWithSubscription = subscribers.map(async (sub) => {
-    const subscriptions = await getSubscriptions(prisma, sub.id);
+    const subscriptions = await getSubscriptions(sub.id, users);
     return { ...sub, userSubscribedTo: subscriptions ?? [] };
   });
 
-  const subscriptions = await getSubscriptions(prisma, id);
+  const subscriptions = (await getSubscriptions(id, users)) ?? [];
   const subscriptionsWithSubscribers = subscriptions.map(async (sub) => {
-    const subscribers = await getSubscribers(prisma, sub.id);
+    const subscribers = await getSubscribers(sub.id, users);
     return { ...sub, subscribedToUser: subscribers ?? [] };
   });
 
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await context.userLoader.load(id);
 
   if (!user) return null;
 
@@ -275,15 +324,15 @@ async function getUser(prisma: PrismaClient, id: string) {
   };
 }
 
-async function getSubscriptions(prisma: PrismaClient, id: string) {
-  return await prisma.user.findMany({
-    where: { subscribedToUser: { some: { subscriberId: id } } },
+async function getSubscriptions(id: string, users: UserWithSubs[]) {
+  return users.filter((user) => {
+    return user.subscribedToUser.some((sub) => sub.subscriberId === id);
   });
 }
 
-async function getSubscribers(prisma: PrismaClient, id: string) {
-  return await prisma.user.findMany({
-    where: { userSubscribedTo: { some: { authorId: id } } },
+async function getSubscribers(id: string, users: UserWithSubs[]) {
+  return users.filter((user) => {
+    return user.userSubscribedTo.some((sub) => sub.authorId === id);
   });
 }
 
